@@ -15,23 +15,21 @@ function waveWarp(x, y, totalWidth, centerX, arcHeight) {
 }
 
 function bulgeWarp(x, y, totalWidth, centerX, warpStrength) {
-  const normX = (x - centerX) / (totalWidth / 2); // -1 to 1
-  const scaleY = 1 + warpStrength * (1 - normX * normX); // bell curve
-  const midY = 80; // font baseline center
+  const normX = (x - centerX) / (totalWidth / 2);
+  const effectiveStrength = warpStrength / 50;
+  const scaleY = 1 + effectiveStrength * (1 - normX * normX);
+  const midY = 150;
   return { x, y: midY + (y - midY) * scaleY };
 }
 
-function bulgeDownWarp(x, y, totalWidth, centerX, arcHeight) {
-  const normX = (x - centerX) / (totalWidth / 2); // -1 ~ 1
-  const offset = arcHeight * (1 - normX * normX); // bell shape
-  const baseline = 80;
-
-  const distance = y - baseline; // 下为正，上为负
-  const stretch = distance > 0 ? distance + offset : distance;
-
+function bulgeDownWarp(x, y, totalWidth, centerX, warpStrength) {
+  const normX = (x - centerX) / (totalWidth / 2); // -1 to 1
+  const effectiveStrength = warpStrength / 50;
+  const scaleY = 1 + effectiveStrength * (1 - normX * normX);
+  const baseline = 100;
   return {
     x,
-    y: baseline + stretch,
+    y: y <= baseline ? y : baseline + (y - baseline) * scaleY,
   };
 }
 
@@ -58,12 +56,9 @@ const WarpText = ({ text, warpType, warpStrength }) => {
         }
 
         const fontSize = 80;
+        const baselineY = 150; // 字形 baseline 抬高
         const scale = fontSize / font.unitsPerEm;
-
-        // ✅ 区分不同 warp 类型的强度单位
-        const arcHeight = warpType.includes("bulge")
-          ? warpStrength // bulge: 0 ~ 1
-          : warpStrength * 100; // arc/wave: 像素值
+        const arcHeight = warpStrength * 100; // px 单位
 
         const glyphs = font.stringToGlyphs(text);
         let x = 0;
@@ -74,7 +69,7 @@ const WarpText = ({ text, warpType, warpStrength }) => {
         const warpFn = warpTypes[warpType].fn;
 
         glyphs.forEach((g) => {
-          const path = g.getPath(x, fontSize, fontSize);
+          const path = g.getPath(x, baselineY, fontSize);
           path.commands.forEach((cmd) => {
             const warped = { ...cmd };
             if ("x" in warped && "y" in warped) {
@@ -128,22 +123,13 @@ const WarpText = ({ text, warpType, warpStrength }) => {
           .join(" ");
 
         setWarpedPath(d);
-        setViewBoxWidth(totalWidth + 40); // 动态宽度
+        setViewBoxWidth(totalWidth + 40);
       }
     );
   }, [text, warpType, warpStrength]);
 
   return (
-    <svg viewBox={`0 -100 ${viewBoxWidth} 1000`} width="100%" height="100%">
-      <line
-        x1="0"
-        y1="80"
-        x2={viewBoxWidth}
-        y2="80"
-        stroke="gray"
-        strokeDasharray="4"
-      />
-
+    <svg viewBox={`0 0 ${viewBoxWidth} 500`} width="100%" height="100%">
       <path d={warpedPath} fill="hotpink" />
     </svg>
   );
@@ -153,8 +139,8 @@ const WarpText = ({ text, warpType, warpStrength }) => {
 
 function App() {
   const [text, setText] = useState("HAVE FUN");
-  const [warpType, setWarpType] = useState("bulge");
-  const [warpStrength, setWarpStrength] = useState(0.45); // default 45% for bulge
+  const [warpType, setWarpType] = useState("bulgeDown");
+  const [warpStrength, setWarpStrength] = useState(0.45);
 
   return (
     <div style={{ padding: 24, background: "#fff" }}>
@@ -182,11 +168,7 @@ function App() {
           onChange={(e) => setWarpStrength(parseFloat(e.target.value))}
           style={{ width: 200 }}
         />
-        <span style={{ marginLeft: 8 }}>
-          {warpType === "bulge"
-            ? `${Math.round(warpStrength * 100)}%`
-            : `${Math.round(warpStrength * 100)}px`}
-        </span>
+        <span style={{ marginLeft: 8 }}>{Math.round(warpStrength * 100)}%</span>
       </div>
 
       <div style={{ marginBottom: 12 }}>
