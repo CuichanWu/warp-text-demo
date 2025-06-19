@@ -33,11 +33,36 @@ function bulgeDownWarp(x, y, totalWidth, centerX, warpStrength) {
   };
 }
 
+function bulgeBothWarp(x, y, totalWidth, centerX, warpStrength) {
+  const normX = (x - centerX) / (totalWidth / 2); // -1 ~ 1
+  const effectiveStrength = warpStrength / 50;
+  const centerY = 125; 
+
+  const scaleY = 1 + effectiveStrength * (1 - normX * normX);
+
+  if (y < centerY) {
+    // 上半部：往上 bulge
+    return {
+      x,
+      y: centerY - (centerY - y) * scaleY,
+    };
+  } else {
+    // 下半部：往下 bulge
+    return {
+      x,
+      y: centerY + (y - centerY) * scaleY,
+    };
+  }
+}
+
+
+
 const warpTypes = {
   arcLower: { label: "下弧形", fn: arcLowerWarp },
   wave: { label: "波浪形", fn: waveWarp },
   bulge: { label: "上膨胀形", fn: bulgeWarp },
   bulgeDown: { label: "下膨胀形", fn: bulgeDownWarp },
+  bulgeBoth: { label: "上下膨胀形", fn: bulgeBothWarp },
 };
 
 // === WarpText Component ===
