@@ -2,212 +2,107 @@ import "./App.css";
 import React, { useEffect, useState } from "react";
 import opentype from "opentype.js";
 
-// === Warp Functions ===
+function smoothFlowWarp(x, y, centerX, strength) {
+  const dx = x - centerX;
+  const normX = dx / 300; // normalize distance to center
+  const normY = (y - 160) / 80; // -1 to 1
 
-function arcLowerWarp(x, y, totalWidth, centerX, arcHeight) {
-  const normX = (x - centerX) / (totalWidth / 2);
-  const arcY = arcHeight * (1 - normX * normX);
-  return { x, y: y + arcY };
+  const xOffset = -normX * strength * 100 * Math.cos(normY * Math.PI / 2);
+  return { x: x + xOffset, y };
 }
 
-function waveWarp(x, y, totalWidth, centerX, arcHeight) {
-  return { x, y: y + Math.sin(x / 40) * arcHeight };
-}
-
-function bulgeWarp(x, y, totalWidth, centerX, warpStrength) {
-  const normX = (x - centerX) / (totalWidth / 2);
-  const effectiveStrength = warpStrength / 50;
-  const scaleY = 1 + effectiveStrength * (1 - normX * normX);
-  const midY = 150;
-  return { x, y: midY + (y - midY) * scaleY };
-}
-
-function bulgeDownWarp(x, y, totalWidth, centerX, warpStrength) {
-  const normX = (x - centerX) / (totalWidth / 2); // -1 to 1
-  const effectiveStrength = warpStrength / 50;
-  const scaleY = 1 + effectiveStrength * (1 - normX * normX);
-  const baseline = 100;
-  return {
-    x,
-    y: y <= baseline ? y : baseline + (y - baseline) * scaleY,
-  };
-}
-
-function bulgeBothWarp(x, y, totalWidth, centerX, warpStrength) {
-  const normX = (x - centerX) / (totalWidth / 2); // -1 ~ 1
-  const effectiveStrength = warpStrength / 50;
-  const centerY = 125; 
-
-  const scaleY = 1 + effectiveStrength * (1 - normX * normX);
-
-  if (y < centerY) {
-    // 上半部：往上 bulge
-    return {
-      x,
-      y: centerY - (centerY - y) * scaleY,
-    };
-  } else {
-    // 下半部：往下 bulge
-    return {
-      x,
-      y: centerY + (y - centerY) * scaleY,
-    };
-  }
-}
-
-
-
-const warpTypes = {
-  arcLower: { label: "下弧形", fn: arcLowerWarp },
-  wave: { label: "波浪形", fn: waveWarp },
-  bulge: { label: "上膨胀形", fn: bulgeWarp },
-  bulgeDown: { label: "下膨胀形", fn: bulgeDownWarp },
-  bulgeBoth: { label: "上下膨胀形", fn: bulgeBothWarp },
-};
-
-// === WarpText Component ===
-
-const WarpText = ({ text, warpType, warpStrength }) => {
-  const [warpedPath, setWarpedPath] = useState("");
+function App() {
+  const [text, setText] = useState("HAPPY HOUR");
+  const [warpStrength, setWarpStrength] = useState(0.6);
+  const [d, setD] = useState("");
   const [viewBoxWidth, setViewBoxWidth] = useState(800);
 
   useEffect(() => {
-    opentype.load(
-      process.env.PUBLIC_URL + "/OldStandardTT-Regular.ttf",
-      (err, font) => {
-        if (err || !font) {
-          console.error("Font load error", err);
-          return;
-        }
+    opentype.load(process.env.PUBLIC_URL + "/OldStandardTT-Regular.ttf", (err, font) => {
+      if (err) {
+        console.error(err);
+        return;
+      }
 
-        const fontSize = 80;
-        const baselineY = 150; // 字形 baseline 抬高
-        const scale = fontSize / font.unitsPerEm;
-        const arcHeight = warpStrength * 100; // px 单位
+      const fontSize = 120;
+      const scale = fontSize / font.unitsPerEm;
+      const baselineY = 160;
+      const glyphs = font.stringToGlyphs(text);
+      const glyphWidths = glyphs.map(g => g.advanceWidth * scale);
+      const totalWidth = glyphWidths.reduce((a, b) => a + b, 0);
+      const centerX = totalWidth / 2;
 
-        const glyphs = font.stringToGlyphs(text);
-        let x = 0;
-        const commands = [];
-        const glyphWidths = glyphs.map((g) => g.advanceWidth * scale);
-        const totalWidth = glyphWidths.reduce((a, b) => a + b, 0);
-        const centerX = totalWidth / 2;
-        const warpFn = warpTypes[warpType].fn;
+      let x = 0;
+      const all = [];
+      glyphs.forEach((g, i) => {
+        const path = g.getPath(x, baselineY, fontSize);
 
-        glyphs.forEach((g) => {
-          const path = g.getPath(x, baselineY, fontSize);
-          path.commands.forEach((cmd) => {
-            const warped = { ...cmd };
-            if ("x" in warped && "y" in warped) {
-              const { x: newX, y: newY } = warpFn(
-                warped.x,
-                warped.y,
-                totalWidth,
-                centerX,
-                arcHeight
-              );
-              warped.x = newX;
-              warped.y = newY;
-            }
-            if ("x1" in warped && "y1" in warped) {
-              const { x: newX1, y: newY1 } = warpFn(
-                warped.x1,
-                warped.y1,
-                totalWidth,
-                centerX,
-                arcHeight
-              );
-              warped.x1 = newX1;
-              warped.y1 = newY1;
-            }
-            if ("x2" in warped && "y2" in warped) {
-              const { x: newX2, y: newY2 } = warpFn(
-                warped.x2,
-                warped.y2,
-                totalWidth,
-                centerX,
-                arcHeight
-              );
-              warped.x2 = newX2;
-              warped.y2 = newY2;
-            }
-            commands.push(warped);
-          });
-          x += g.advanceWidth * scale;
+        path.commands.forEach(cmd => {
+          const c = { ...cmd };
+
+          if ("x" in c && "y" in c) {
+            const warped = smoothFlowWarp(c.x, c.y, centerX, warpStrength);
+            c.x = warped.x;
+            c.y = warped.y;
+          }
+          if ("x1" in c && "y1" in c) {
+            const warped = smoothFlowWarp(c.x1, c.y1, centerX, warpStrength);
+            c.x1 = warped.x;
+            c.y1 = warped.y;
+          }
+          if ("x2" in c && "y2" in c) {
+            const warped = smoothFlowWarp(c.x2, c.y2, centerX, warpStrength);
+            c.x2 = warped.x;
+            c.y2 = warped.y;
+          }
+
+          all.push(c);
         });
 
-        const d = commands
-          .map((c) => {
-            if (c.type === "M") return `M ${c.x} ${c.y}`;
-            if (c.type === "L") return `L ${c.x} ${c.y}`;
-            if (c.type === "C")
-              return `C ${c.x1} ${c.y1}, ${c.x2} ${c.y2}, ${c.x} ${c.y}`;
-            if (c.type === "Q") return `Q ${c.x1} ${c.y1}, ${c.x} ${c.y}`;
-            if (c.type === "Z") return "Z";
-            return "";
-          })
-          .join(" ");
+        x += glyphWidths[i];
+      });
 
-        setWarpedPath(d);
-        setViewBoxWidth(totalWidth + 40);
-      }
-    );
-  }, [text, warpType, warpStrength]);
+      const pathData = all.map(c => {
+        if (c.type === "M") return `M ${c.x} ${c.y}`;
+        if (c.type === "L") return `L ${c.x} ${c.y}`;
+        if (c.type === "C") return `C ${c.x1} ${c.y1}, ${c.x2} ${c.y2}, ${c.x} ${c.y}`;
+        if (c.type === "Q") return `Q ${c.x1} ${c.y1}, ${c.x} ${c.y}`;
+        if (c.type === "Z") return "Z";
+        return "";
+      }).join(" ");
 
-  return (
-    <svg viewBox={`0 0 ${viewBoxWidth} 500`} width="100%" height="100%">
-      <path d={warpedPath} fill="hotpink" />
-    </svg>
-  );
-};
-
-// === App Component ===
-
-function App() {
-  const [text, setText] = useState("HAVE FUN");
-  const [warpType, setWarpType] = useState("bulgeDown");
-  const [warpStrength, setWarpStrength] = useState(0.45);
+      setD(pathData);
+      setViewBoxWidth(totalWidth + 40);
+    });
+  }, [text, warpStrength]);
 
   return (
-    <div style={{ padding: 24, background: "#fff" }}>
-      <h2>Adobe-style Warp Text</h2>
-
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ marginRight: 8 }}>变形类型：</label>
-        <select value={warpType} onChange={(e) => setWarpType(e.target.value)}>
-          {Object.entries(warpTypes).map(([key, val]) => (
-            <option key={key} value={key}>
-              {val.label}
-            </option>
-          ))}
-        </select>
+    <div style={{ padding: 24, background: "#222", color: "white" }}>
+      <h2>花束型</h2>
+      <div>
+        <label>文本：</label>
+        <input
+          value={text}
+          onChange={e => setText(e.target.value)}
+          style={{ padding: 8, width: 300 }}
+        />
       </div>
-
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ marginRight: 8 }}>强度：</label>
+      <div style={{ marginTop: 12 }}>
+        <label>强度：</label>
         <input
           type="range"
           min="0"
           max="1"
           step="0.01"
           value={warpStrength}
-          onChange={(e) => setWarpStrength(parseFloat(e.target.value))}
-          style={{ width: 200 }}
+          onChange={e => setWarpStrength(parseFloat(e.target.value))}
         />
-        <span style={{ marginLeft: 8 }}>{Math.round(warpStrength * 100)}%</span>
+        <span style={{ marginLeft: 12 }}>{Math.round(warpStrength * 100)}%</span>
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ marginRight: 8 }}>输入文本：</label>
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          style={{ border: "1px solid #ccc", padding: 8, borderRadius: 4 }}
-          placeholder="Enter your word"
-        />
-      </div>
-
-      <WarpText text={text} warpType={warpType} warpStrength={warpStrength} />
+      <svg viewBox={`0 0 ${viewBoxWidth} 300`} width="100%" height="300px">
+        <path d={d} fill="hotpink" />
+      </svg>
     </div>
   );
 }
