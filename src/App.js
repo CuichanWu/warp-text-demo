@@ -54,12 +54,35 @@ function concaveTopWarp(x, y, totalWidth, centerX, arcHeight, textMetrics) {
   };
 }
 
+function concaveBottomWarp(x, y, totalWidth, centerX, warpStrength, textMetrics) {
+  const normX = (x - centerX) / (totalWidth / 2); // -1 ~ 1
+  const strength = warpStrength / 50;
+
+  // 从中间向两边 scaleY 从 min 到 1（反向 bulge）
+  const scaleY = 1 - strength * (1 - normX * normX);
+
+  const baseline = 90;
+
+  if (y <= baseline) {
+    return { x, y }; // baseline 以上不变
+  } else {
+    return {
+      x,
+      y: baseline + (y - baseline) * scaleY, // baseline 以下按 scaleY 缩放
+    };
+  }
+}
+
+
+
 const warpTypes = {
   arcLower: { label: "下弧形", fn: arcLowerWarp },
   wave: { label: "波浪形", fn: waveWarp },
   bulge: { label: "上膨胀形", fn: bulgeWarp },
   bulgeDown: { label: "下膨胀形", fn: bulgeDownWarp },
   concaveUp: { label: "上凹形（底部对齐）", fn: concaveTopWarp },
+  concaveDown: { label: "下凹形（顶部对齐）", fn: concaveBottomWarp },
+
 };
 
 const WarpText = ({ text, warpType, warpStrength }) => {
