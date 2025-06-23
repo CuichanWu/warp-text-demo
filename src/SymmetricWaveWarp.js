@@ -1,7 +1,7 @@
 // symmetricWaveWarp.js
 export function symmetricWaveWarp(x, y, totalWidth, centerX, intensity, textMetrics) {
-  const waveLength = 60;
-  const amplitude = intensity / 2;
+  const waveLength = 120;
+  const amplitude = intensity / 6;
 
   const top = textMetrics.boundingBox.y;
   const bottom = textMetrics.boundingBox.y + textMetrics.boundingBox.height;
