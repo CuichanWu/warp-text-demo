@@ -1,8 +1,17 @@
+// App.js
 import "./App.css";
 import React, { useEffect, useState } from "react";
 import opentype from "opentype.js";
+import { symmetricWaveWarp } from "./SymmetricWaveWarp.js";
 
 // === Warp Functions ===
+const warpTypes = {
+  arcLower: { label: "下弧形", fn: arcLowerWarp },
+  wave: { label: "波浪形", fn: waveWarp },
+  bulge: { label: "上膨胀形", fn: bulgeWarp },
+  bulgeDown: { label: "下膨胀形", fn: bulgeDownWarp },
+  symmetricWave: { label: "对称波动", fn: symmetricWaveWarp },
+};
 
 function arcLowerWarp(x, y, totalWidth, centerX, arcHeight) {
   const normX = (x - centerX) / (totalWidth / 2);
@@ -23,7 +32,7 @@ function bulgeWarp(x, y, totalWidth, centerX, warpStrength) {
 }
 
 function bulgeDownWarp(x, y, totalWidth, centerX, warpStrength) {
-  const normX = (x - centerX) / (totalWidth / 2); // -1 to 1
+  const normX = (x - centerX) / (totalWidth / 2);
   const effectiveStrength = warpStrength / 50;
   const scaleY = 1 + effectiveStrength * (1 - normX * normX);
   const baseline = 100;
@@ -32,15 +41,6 @@ function bulgeDownWarp(x, y, totalWidth, centerX, warpStrength) {
     y: y <= baseline ? y : baseline + (y - baseline) * scaleY,
   };
 }
-
-const warpTypes = {
-  arcLower: { label: "下弧形", fn: arcLowerWarp },
-  wave: { label: "波浪形", fn: waveWarp },
-  bulge: { label: "上膨胀形", fn: bulgeWarp },
-  bulgeDown: { label: "下膨胀形", fn: bulgeDownWarp },
-};
-
-// === WarpText Component ===
 
 const WarpText = ({ text, warpType, warpStrength }) => {
   const [warpedPath, setWarpedPath] = useState("");
@@ -56,9 +56,9 @@ const WarpText = ({ text, warpType, warpStrength }) => {
         }
 
         const fontSize = 80;
-        const baselineY = 150; // 字形 baseline 抬高
+        const baselineY = 150;
         const scale = fontSize / font.unitsPerEm;
-        const arcHeight = warpStrength * 100; // px 单位
+        const arcHeight = warpStrength * 100;
 
         const glyphs = font.stringToGlyphs(text);
         let x = 0;
@@ -70,6 +70,26 @@ const WarpText = ({ text, warpType, warpStrength }) => {
 
         glyphs.forEach((g) => {
           const path = g.getPath(x, baselineY, fontSize);
+          // const bbox = g.getBoundingBox();
+          // const textMetrics = {
+          //   boundingBox: bbox,
+          //   baseline: baselineY,
+          // };
+
+          const bbox = g.getBoundingBox();
+          const scaledBBox = {
+            y: baselineY + bbox.y1 * scale,
+            height: (bbox.y2 - bbox.y1) * scale,
+          };
+          const textMetrics = {
+            boundingBox: {
+              y: scaledBBox.y,
+              height: scaledBBox.height,
+            },
+            baseline: baselineY,
+          };
+
+
           path.commands.forEach((cmd) => {
             const warped = { ...cmd };
             if ("x" in warped && "y" in warped) {
@@ -78,7 +98,8 @@ const WarpText = ({ text, warpType, warpStrength }) => {
                 warped.y,
                 totalWidth,
                 centerX,
-                arcHeight
+                arcHeight,
+                textMetrics
               );
               warped.x = newX;
               warped.y = newY;
@@ -89,7 +110,8 @@ const WarpText = ({ text, warpType, warpStrength }) => {
                 warped.y1,
                 totalWidth,
                 centerX,
-                arcHeight
+                arcHeight,
+                textMetrics
               );
               warped.x1 = newX1;
               warped.y1 = newY1;
@@ -100,7 +122,8 @@ const WarpText = ({ text, warpType, warpStrength }) => {
                 warped.y2,
                 totalWidth,
                 centerX,
-                arcHeight
+                arcHeight,
+                textMetrics
               );
               warped.x2 = newX2;
               warped.y2 = newY2;
@@ -135,11 +158,9 @@ const WarpText = ({ text, warpType, warpStrength }) => {
   );
 };
 
-// === App Component ===
-
 function App() {
   const [text, setText] = useState("HAVE FUN");
-  const [warpType, setWarpType] = useState("bulgeDown");
+  const [warpType, setWarpType] = useState("symmetricWave");
   const [warpStrength, setWarpStrength] = useState(0.45);
 
   return (
