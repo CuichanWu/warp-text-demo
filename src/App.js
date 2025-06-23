@@ -73,6 +73,50 @@ function concaveBottomWarp(x, y, totalWidth, centerX, warpStrength, textMetrics)
   }
 }
 
+function slantDownRightWarp(x, y, totalWidth, centerX, warpStrength, textMetrics) {
+  const baseline = 100;
+  if (y <= baseline) return { x, y };
+
+  const leftX = centerX - totalWidth / 2;
+  const ratio = (x - leftX) / totalWidth / 100; // 0 (左) 到 1 (右)
+
+  const minScale = 0.1;
+  const targetScale = 1 - 0.9 * warpStrength; // 最小 scaleY = 0.1
+
+  const scaleY = Math.max(
+    minScale,
+    1 - (1 - targetScale) * ratio // 从 1 平滑过渡到 targetScale
+  );
+
+  return {
+    x,
+    y: baseline + (y - baseline) * scaleY,
+  };
+}
+
+
+function slantDownLeftWarp(x, y, totalWidth, centerX, warpStrength, textMetrics) {
+  const baseline = 100;
+  if (y <= baseline) return { x, y };
+
+  const leftX = centerX - totalWidth / 2;
+  const ratio = (1 - (x - leftX) / totalWidth) / 100; // 右侧为 0，左侧为 1（缓慢）
+
+  const minScale = 0.1;
+  const targetScale = 1 - 0.9 * warpStrength;
+
+  const scaleY = Math.max(
+    minScale,
+    1 - (1 - targetScale) * ratio
+  );
+
+  return {
+    x,
+    y: baseline + (y - baseline) * scaleY,
+  };
+}
+
+
 
 
 const warpTypes = {
@@ -82,7 +126,8 @@ const warpTypes = {
   bulgeDown: { label: "下膨胀形", fn: bulgeDownWarp },
   concaveUp: { label: "上凹形（底部对齐）", fn: concaveTopWarp },
   concaveDown: { label: "下凹形（顶部对齐）", fn: concaveBottomWarp },
-
+  slantDownRight: { label: "下斜形（右低）", fn: slantDownRightWarp },
+  slantDownLeft: { label: "下斜形（左低）", fn: slantDownLeftWarp },
 };
 
 const WarpText = ({ text, warpType, warpStrength }) => {
