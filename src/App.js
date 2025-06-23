@@ -23,7 +23,7 @@ function bulgeWarp(x, y, totalWidth, centerX, warpStrength) {
 }
 
 function bulgeDownWarp(x, y, totalWidth, centerX, warpStrength) {
-  const normX = (x - centerX) / (totalWidth / 2); // -1 to 1
+  const normX = (x - centerX) / (totalWidth / 2);
   const effectiveStrength = warpStrength / 50;
   const scaleY = 1 + effectiveStrength * (1 - normX * normX);
   const baseline = 100;
@@ -33,14 +33,34 @@ function bulgeDownWarp(x, y, totalWidth, centerX, warpStrength) {
   };
 }
 
+// ✅ 重点：上凹形变形，baseline 不动，上方中间凹陷
+function concaveTopWarp(x, y, totalWidth, centerX, arcHeight, textMetrics) {
+  const baseline = textMetrics.baseline;
+  const top = textMetrics.boundingBox.y;
+
+  if (y >= baseline) return { x, y }; // baseline 以下不变
+
+  const normX = (x - centerX) / (totalWidth / 2); // -1 to 1
+  const horizontalFactor = 1 - normX * normX; // 抛物线：中间最大
+
+  const normY = (baseline - y) / (baseline - top); // y 越靠近 top，值越大
+  const verticalFactor = normY;
+
+  const offsetY = arcHeight * horizontalFactor * verticalFactor;
+
+  return {
+    x,
+    y: y + offsetY, // 向下压（所以是 +offsetY）
+  };
+}
+
 const warpTypes = {
   arcLower: { label: "下弧形", fn: arcLowerWarp },
   wave: { label: "波浪形", fn: waveWarp },
   bulge: { label: "上膨胀形", fn: bulgeWarp },
   bulgeDown: { label: "下膨胀形", fn: bulgeDownWarp },
+  concaveUp: { label: "上凹形（底部对齐）", fn: concaveTopWarp },
 };
-
-// === WarpText Component ===
 
 const WarpText = ({ text, warpType, warpStrength }) => {
   const [warpedPath, setWarpedPath] = useState("");
@@ -56,9 +76,9 @@ const WarpText = ({ text, warpType, warpStrength }) => {
         }
 
         const fontSize = 80;
-        const baselineY = 150; // 字形 baseline 抬高
+        const baselineY = 150;
         const scale = fontSize / font.unitsPerEm;
-        const arcHeight = warpStrength * 100; // px 单位
+        const arcHeight = warpStrength * 100;
 
         const glyphs = font.stringToGlyphs(text);
         let x = 0;
@@ -67,6 +87,14 @@ const WarpText = ({ text, warpType, warpStrength }) => {
         const totalWidth = glyphWidths.reduce((a, b) => a + b, 0);
         const centerX = totalWidth / 2;
         const warpFn = warpTypes[warpType].fn;
+
+        const textMetrics = {
+          boundingBox: {
+            y: baselineY - fontSize,
+            height: fontSize,
+          },
+          baseline: baselineY,
+        };
 
         glyphs.forEach((g) => {
           const path = g.getPath(x, baselineY, fontSize);
@@ -78,7 +106,8 @@ const WarpText = ({ text, warpType, warpStrength }) => {
                 warped.y,
                 totalWidth,
                 centerX,
-                arcHeight
+                arcHeight,
+                textMetrics
               );
               warped.x = newX;
               warped.y = newY;
@@ -89,7 +118,8 @@ const WarpText = ({ text, warpType, warpStrength }) => {
                 warped.y1,
                 totalWidth,
                 centerX,
-                arcHeight
+                arcHeight,
+                textMetrics
               );
               warped.x1 = newX1;
               warped.y1 = newY1;
@@ -100,7 +130,8 @@ const WarpText = ({ text, warpType, warpStrength }) => {
                 warped.y2,
                 totalWidth,
                 centerX,
-                arcHeight
+                arcHeight,
+                textMetrics
               );
               warped.x2 = newX2;
               warped.y2 = newY2;
@@ -135,8 +166,6 @@ const WarpText = ({ text, warpType, warpStrength }) => {
   );
 };
 
-// === App Component ===
-
 function App() {
   const [text, setText] = useState("HAVE FUN");
   const [warpType, setWarpType] = useState("bulgeDown");
@@ -168,7 +197,9 @@ function App() {
           onChange={(e) => setWarpStrength(parseFloat(e.target.value))}
           style={{ width: 200 }}
         />
-        <span style={{ marginLeft: 8 }}>{Math.round(warpStrength * 100)}%</span>
+        <span style={{ marginLeft: 8 }}>
+          {Math.round(warpStrength * 100)}%
+        </span>
       </div>
 
       <div style={{ marginBottom: 12 }}>
@@ -182,7 +213,11 @@ function App() {
         />
       </div>
 
-      <WarpText text={text} warpType={warpType} warpStrength={warpStrength} />
+      <WarpText
+        text={text}
+        warpType={warpType}
+        warpStrength={warpStrength}
+      />
     </div>
   );
 }
